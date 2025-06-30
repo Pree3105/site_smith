@@ -19,7 +19,7 @@ const Home = () => {
           <FaHammer size={42} className='mb-4'/> 
         <div/>
         <div>
-          <h1 className='text-3xl font-bold mb-2'>Website Builder AI</h1>
+          <h1 className='text-3xl font-bold mb-2'>Site Smith AI</h1>
           <h2 className='text-2xl'>Imagine Your Perfect Website. We'll Make It Real</h2>
         </div>
         <form className='w-full' onSubmit={handleSubmit(onSubmit)} >

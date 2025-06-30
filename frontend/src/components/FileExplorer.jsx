@@ -1,18 +1,24 @@
 import React,{useState} from 'react';
 import {ChevronDown, ChevronRight, FolderTree, File, Folder} from 'lucide-react';
-//ChevronRight	A collapsed folder (clicking expands it).
-//ChevronDown	An expanded folder (clicking collapses it).
 
 
 //FileNode handles individual files and folders, if folder clicked- drop down files , if file is clicked-Recursively renders child items.
-function FileNode({item, depth, onFileClick}){
+function FileNode({item, depth, onFileClick,path = ''}){
   const [isExpanded, setIsExpanded]=useState(false);
+  // Building the current path
+  // const currentPath = path ? `${path}/${item.name}` : item.name;
+  const currentPath = [path, item.name].filter(Boolean).join('/');
   const handleClick=()=>{
     if(item.type==="folder"){
-      setIsExpanded(isExpanded);
+      setIsExpanded(prev => !prev); 
     }
     else{
-      onFileClick(item);
+      // console.log('Clicked file:', item);
+       const fileToSelect = { 
+          ...item,
+          path: currentPath 
+        };
+        onFileClick(fileToSelect);
     }
   };
 
@@ -24,13 +30,13 @@ function FileNode({item, depth, onFileClick}){
             {isExpanded? (<ChevronDown className='w-4 h-4'/>):(<ChevronRight className='w-4 h-4'/>)}
           </span>
         )}
-        {item.type==='folder'?(<FolderTree className='w-4 h-4 text-blue-400'/>):(<File className='w-4 h-4 text-blue-400'/>)}
-        <span>{item.name}</span>
+        {item.type==='folder'?(<Folder className='w-4 h-4 text-yellow-400'/>):(<File className='w-4 h-4 text-blue-400'/>)}
+        <span className='text-sm text-white'>{item.name}</span>
       </div>
       {item.type==='folder' && isExpanded && item.children && (
-        <div>
+        <div >
           {item.children.map((child, index)=>(
-            <FileNode key={`${child.path}-${index}`}   item={child}  depth={depth+1}  onFileClick={onFileClick}/>
+            <FileNode key={`${currentPath}/${child.name}-${index}`}   item={child}  depth={depth+1}  onFileClick={onFileClick} path={currentPath}/>
           ))}
           </div>
       ) }
@@ -41,14 +47,16 @@ function FileNode({item, depth, onFileClick}){
 //render each file
 export function FileExplorer({files, onFileSelect}){
   return(
-    <div className='bg-gray-900 rounded-lg shadow-lg p-4 h-full overflow-auto'>
-      <h2 className='text-lg font-semibold mb-4 flex items-center gap-2 text-gray-100'>
+    <div className='bg-gray-900 rounded-lg shadow-lg p-4 h-full overflow-auto text-white'>
+      <h2 className='text-lg font-semibold mb-4 flex items-center gap-2 text-white'>
         <FolderTree className='w-4 h-4'/>
         File Explorer
       </h2>
+      <div className='space-y-1'>
       {files.map((file, index)=>(
-        <FileNode key={`${file.path}-${index}`}  item={file} depth={0} onFileClick={onFileSelect}/>
+        <FileNode key={`${file.name}-${index}`}  item={file} depth={0} onFileClick={onFileSelect}/>
       ))}
+    </div>
     </div>
   )
 }

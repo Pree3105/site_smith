@@ -22,7 +22,16 @@ const BASE_PROMPT = `For all designs I ask you to make, have them be beautiful, 
 
 By default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.
 
-Use icons from lucide-react for logos.
+Use icons from lucide-react for logos. Keep the background color for all pages and components white
+
+For placeholder images:
+1. Use direct links from images.unsplash.com (not source.unsplash.com)
+2. Example format: https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=compress&cs=tinysrgb&w=800
+3. Must include ?auto=compress parameter
+4. Verify URLs work before including them
+5. Never use /random endpoint
+6. Set width parameter (?w=800) to avoid huge files
+how does this fix the coep/corp problems
 
 Use stock photos from unsplash where appropriate, only valid URLs you know exist. Do not download the images, only link to them in image tags.
 
@@ -50,7 +59,7 @@ Do NOT explain anything outside XML. The response must start and end with <boltA
 // Main function to generate system prompt
 const getSystemPrompt = (cwd = WORK_DIR) => {
   return `
-You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
+You are Site_smith, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
 Your response format MUST always be **XML**. Do not return markdown, JSON, or any other format. 
 
 <system_constraints>
@@ -155,7 +164,7 @@ const generateDiffSpec = () => {
       }
 
       -console.log('Hello, World!');
-      +console.log('Hello, Bolt!');
+      +console.log('Hello, Site_smith!');
       +
       function greet() {
       -  return 'Greetings!';

@@ -60,12 +60,14 @@ const basePrompt = `
       "dependencies": {
         "lucide-react": "^0.344.0",
         "react": "^18.3.1",
-        "react-dom": "^18.3.1"
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^6.22.1"
       },
       "devDependencies": {
         "@eslint/js": "^9.9.1",
         "@types/react": "^18.3.5",
         "@types/react-dom": "^18.3.0",
+        "@types/react-router-dom": "^5.3.3",
         "@vitejs/plugin-react": "^4.3.1",
         "autoprefixer": "^10.4.18",
         "eslint": "^9.9.1",
@@ -171,7 +173,50 @@ const basePrompt = `
       );
     }
 
+     // Check if pages exist (will be auto-populated later)
+    const pages = [];
+    const hasPages = pages.length > 0;
+
+    // Auto-configure router if pages exist
+    const App = hasPages ? (() => {
+      const { BrowserRouter: Router, Routes, Route } = require('react-router-dom');
+      const Navbar = pages.includes('Navbar') ? require('./components/Navbar').default : null;
+
+      return function RoutedApp() {
+        return (
+          <Router>
+            {Navbar && <Navbar />}
+            <Routes>
+              {pages.map((page) => (
+                <Route 
+                  key={page} 
+                  path={page === 'Home' ? '/' : \`/\${page.toLowerCase()}\`} 
+                  element={React.createElement(require(\`./pages/\${page}\`).default)} 
+                />
+              ))}
+            </Routes>
+          </Router>
+        );
+      };
+    })() : DefaultApp;
+
     export default App;
+  </boltAction>
+
+  <!-- Pages are generated DYNAMICALLY based on user's prompt -->
+  <!-- Example: If user asks for "Shop" and "Contact" pages, your AI will add: -->
+  <!-- 
+    <boltAction type="file" filePath="src/pages/Shop.tsx">
+      export default function Shop() { return <div>Shop Page</div>; }
+    </boltAction>
+    <boltAction type="file" filePath="src/pages/Contact.tsx">
+      export default function Contact() { return <div>Contact Page</div>; }
+    </boltAction>
+    <boltAction type="file" filePath="src/components/Navbar.tsx">
+      export default function Navbar() { ... }
+    </boltAction>
+  -->
+
   </boltAction>
   <boltAction type="file" filePath="src/index.css">
     @tailwind base;

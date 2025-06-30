@@ -9,6 +9,7 @@ import { TabView } from "../components/TabView";
 import { CodeEditor } from "../components/CodeEditor";
 import { PreviewFrame } from "../components/PreviewFrame";
 import { Loader } from "../components/Loader";
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 import { useWebContainer } from '../hooks/useWebContainer';
 import { parseXml } from '../steps';
@@ -26,45 +27,25 @@ export function Builder() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [steps, setSteps] = useState([]);
   const [files, setFiles] = useState([]);
-  const webcontainer = useWebContainer();
+  const [fileError, setFileError] = useState(null);
+  const  { webcontainer, isReady } = useWebContainer();
+  const initialized = React.useRef(false);
 
-  // Initialize and fetch initial data
-//   useEffect(() => {
-//     const initialize = async () => {   //async function returns a promise, perform multiple operations (API calls, parsing data) sequentially
-//       setLoading(true);
-//       try {
-//         const safePrompt = prompt ? prompt.trim() : "";
-//         const { data } = await axios.post(`${BACKEND_URL}/template`, { prompt: safePrompt });  //sends a POST request to ${BACKEND_URL}/template with the trimmed prompt.. returns a template(node/react)
-//       setTemplateSet(true);     // template data has been fetched successfully
-
-//         const parsedSteps = parseXml(data.uiPrompts[0]).map((step) => ({   ...step, 
-//   status: 'pending',}));      // Parses the first UI prompt (xml format) in the API response(steps) 
-
-//         setSteps(parsedSteps);
-
-// // request body contains a messages array, which is created by mapping over data.prompts from the first API response (template received)
-//         const chatResponse = await axios.post(`${BACKEND_URL}/chat`, {
-//           messages: data.prompts.map((content) => ({ role: 'user', content })),
-//         });
-
-//         setSteps((prevSteps) => [    //appending the parsed steps
-//           ...prevSteps,
-//           ...parseXml(chatResponse.data.response).map((step) => ({ ...step, status: 'pending' })),  //.map() - each parsed step to include status: 'pending'
-//         ]);
-//         setLlmMessages(data.prompts);    //prompts- from 1st API call
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//     initialize();
-//   }, [prompt]);
+  useEffect(() => {
+    console.log("WebContainer debug:", {containerExists: !!webcontainer,isReady, filesCount: files.length,templateSet});
+  }, [webcontainer, isReady, files, templateSet]);
 
 
 useEffect(() => {
   const makeRequest = async (url, payload, retries = 3) => {
     for (let i = 0; i < retries; i++) {
       try {
-        const response = await axios.post(url, payload);
+        const response = await axios.post(url, payload,{
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true, // send cookies, required for CORS with credentials
+      });
         return response.data;
       } catch (error) {
         if (i === retries - 1) throw error;
@@ -74,51 +55,91 @@ useEffect(() => {
   };
 
   const initialize = async () => {
-    if (!prompt) return; // Don't initialize without a prompt
+    if (!prompt || initialized.current) return;
+    initialized.current = true;
+
     
     setLoading(true);
     try {
       const safePrompt = prompt.trim();
       
       // First request with retry
-      const templateData = await makeRequest(
-        `${BACKEND_URL}/template`, 
-        { prompt: safePrompt }
-      );
+      const templateData = await makeRequest(`${BACKEND_URL}/template`, { prompt: safePrompt });
+      //template data-
+      //       if (responseContent.includes("React")) {
+      //   return res.json({
+      //     prompts: [BASE_PROMPT, reactBasePrompt],
+      //     uiPrompts: [reactBasePrompt],
+      //   });
+      // }
       
       setTemplateSet(true);
       
-      const parsedSteps = parseXml(templateData.uiPrompts[0]).map(step => ({
-        ...step,
-        status: 'pending'
-      }));
-      setSteps(parsedSteps);
+      //steps should be set after getting the final code, not just the template??
+      // const parsedSteps = parseXml(templateData.uiPrompts[0]).map(step => ({
+      //   ...step,
+      //   status: 'pending'
+      // }));
+      // setSteps(parsedSteps);
+              const templateSteps = parseXml(templateData.uiPrompts[0]).map((step, index) => ({
+          ...step,
+          id: `template-${index}-${Date.now()}`,
+          status: 'pending'
+        }));
 
       // Second request with retry
-      const chatData = await makeRequest(
-        `${BACKEND_URL}/chat`,
+      const chatData = await makeRequest(`${BACKEND_URL}/chat`,
         {
-          messages: templateData.prompts.map(content => ({
+          messages:[
+            {
+              role:'user',
+              content:safePrompt  //og prompt
+            },
+            ...templateData.prompts.map(content => ({
             role: 'user',
             content
           }))
+          ]
         }
       );
 
-      if (chatData.response) {
-        setSteps(prevSteps => [
-          ...prevSteps,
-          ...parseXml(chatData.response).map(step => ({
-            ...step,
-            status: 'pending'
-          }))
-        ]);
-      }
+    //       if (chatData.response) {
+    //   const finalSteps = parseXml(chatData.response).map(step => ({
+    //     ...step,
+    //     status: 'pending'
+    //   }));
+    //   setSteps(finalSteps);
+    // }
+
+        const implementationSteps = chatData.response 
+          ? parseXml(chatData.response).map((step, index) => ({
+              ...step,
+              id: `impl-${index}-${Date.now()}`,
+              status: 'pending'
+            }))
+          : [];
+
+        setSteps([...templateSteps, ...implementationSteps]);
       
-      setLlmMessages(templateData.prompts);
+      // setLlmMessages(templateData.prompts);
+
+       setLlmMessages([
+      {
+        role: 'user',
+        content: safePrompt
+      },
+      ...templateData.prompts.map(content => ({
+        role: 'system', 
+        content
+      })),
+      {
+        role: 'assistant',
+        content: chatData?.response || ''
+      }
+    ]);
     } catch (error) {
       console.error('Initialization failed:', error);
-      // Add user-friendly error handling
+      initialized.current = false;
     } finally {
       setLoading(false);
     }
@@ -168,6 +189,9 @@ useEffect(() => {
 
   // any time files change Sync file structure with WebContainer
   useEffect(() => {
+    console.log("Files:", files); 
+  console.log("WebContainer state:", { isReady, webcontainer, templateSet });
+    const mountFiles = async () => {
     if (!webcontainer) {
       console.warn("WebContainer is not ready yet. Skipping mount.");
       return; // Exit early if WebContainer is not initialized
@@ -175,27 +199,46 @@ useEffect(() => {
   
     if (!files || files.length === 0) {
       console.warn("No files available to mount.");
-      return; // Exit early if there are no files
+      return; 
     }
     
 
-
+    try{
     const prepareMountStructure = (files) => {
       const structure = {};     //empty object
       files.forEach((file) => {  //for loop
         if (file.type === 'file') {
-          structure[file.name] = { file: { contents: file.content || '' } };
-        } else if (file.type === 'folder') {     //recursive call
+          if (typeof file.content !== 'string') {
+            console.warn('Invalid file content:', file.name, file.content);
+            file.content = '';
+          }
+          structure[file.name] = { file: { contents: file.content } };
+        }
+ else if (file.type === 'folder' && file.children) {     //recursive call
           structure[file.name] = { directory: prepareMountStructure(file.children) };
         }
       });
       return structure;
     };
 
-    console.log("Mounting file structure to WebContainer...");
-  const mountStructure = prepareMountStructure(files);
-  webcontainer.mount(mountStructure);
-  }, [files, webcontainer]);
+    console.log("Preparing mount structure...");
+    const mountStructure = prepareMountStructure(files);
+    console.log("Mounting files...", mountStructure);
+    //null error possibility
+    try {
+      await webcontainer.mount(mountStructure);
+      console.log("Files mounted successfully");
+    } catch (mountError) {
+      console.error("Error during mount operation:", mountError);
+    }
+  } catch (error) {
+    console.error("Error mounting files:", error);
+  }
+};
+if (isReady && webcontainer  && files.length > 0 && templateSet) {
+  mountFiles();
+}
+  }, [files, webcontainer,isReady,templateSet]);
 
   const handleUserPrompt = async () => {
     setLoading(true);
@@ -241,17 +284,37 @@ useEffect(() => {
 
           {/* File Explorer */}
           <div className="col-span-1">
-            <FileExplorer files={files} onFileSelect={setSelectedFile} />
+            <FileExplorer files={files}  onFileSelect={(file) => {
+          try {
+            setSelectedFile(file);
+            setFileError(null);
+          } catch (error) {
+            setFileError('Failed to select file');
+            console.error('File selection error:', error);
+          }
+        }}  />
+          {fileError && (
+            <div className="text-red-500 text-sm mt-2">{fileError}</div>
+          )}
           </div>
 
           {/* Main Editor/Preview */}
           <div className="col-span-2">
             <TabView activeTab={activeTab} onTabChange={setActiveTab} />
             {activeTab === 'code' ? (
+              <>
+               {console.log('Selected file:', selectedFile)}
               <CodeEditor file={selectedFile} />
+              </>
             ) : (
+              isReady?(
               <PreviewFrame webContainer={webcontainer} files={files} />
-            )}
+            ):(
+              <div className="flex items-center justify-center h-full">
+              <p className="text-gray-400">Initializing WebContainer...</p>
+              </div>
+            )
+          )}
           </div>
         </div>
       </div>
